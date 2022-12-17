@@ -1,0 +1,10 @@
+{
+    "name": "debug",
+    "version": "1.0",
+    "scripts": {
+        "run": "ts-node ./waveFunctionAlgorithm.ts"
+    },
+    "devDependencies": {
+        "ts-node": "^10.9.1"
+    }
+}

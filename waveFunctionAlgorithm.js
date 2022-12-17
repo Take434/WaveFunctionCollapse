@@ -31,29 +31,33 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const fs = __importStar(require("fs"));
+const png = __importStar(require("fast-png"));
 const iobuffer_1 = require("iobuffer");
+const ts_data_stack_1 = __importDefault(require("ts-data.stack"));
 class WfcModel {
     constructor(path, outputDims) {
         this.output = [[[]]];
         this.entropyMap = [[]];
         this.isCollapsed = false;
         this.isContradicted = false;
-        var jsonData = JSON.parse(fs.readFileSync('' + path, 'utf-8'));
+        let jsonData = JSON.parse(fs.readFileSync('' + path, 'utf-8'));
         this.lookUp = jsonData.map(e => e.Path);
         this.weightings = jsonData.map(e => e.Weight);
         this.ruleset = jsonData.map(e => e.Rules);
         this.outputDims = outputDims;
         this.initializeOutput();
-        console.log(this.output);
-        console.log(this.entropyMap);
     }
     collapse() {
         while (!this.isCollapsed) {
             const nextField = this.chooseNextField();
             this.placeTile(nextField);
             this.propagateChanges(nextField);
+            this.isCollapsed = this.checkCollapsed();
         }
         if (this.isContradicted) {
             console.error("reached Contradiction");
@@ -63,16 +67,18 @@ class WfcModel {
         this.initializeOutput();
         this.collapse();
     }
-    // public getResultAsDecodedPNG() : DecodedPng {
-    // }
+    getResultAsDecodedPNG() {
+        console.log(this.output);
+    }
     saveResultAsFile(filePath) {
         return __awaiter(this, void 0, void 0, function* () {
+            const a = png.decode(yield this.getImgAsIOBuffer("tilesets/test.png"));
         });
     }
     getImgAsIOBuffer(filePath) {
         return new Promise((resolve, reject) => {
-            var img = fs.createReadStream('tilesets/test.png');
-            var imgBuff;
+            let img = fs.createReadStream('tilesets/test.png');
+            let imgBuff;
             let chunks = [];
             img.on('data', (chunk) => {
                 chunks.push(chunk);
@@ -101,12 +107,138 @@ class WfcModel {
         }
     }
     chooseNextField() {
-        return [0, 0];
+        let nextField = [0, 0];
+        let lowestEntropy = this.entropyMap[0][0];
+        for (let i = 0; i < this.entropyMap.length; i++) {
+            for (let j = 0; j < this.entropyMap[i].length; j++) {
+                if (lowestEntropy === 1 || this.entropyMap[i][j] < lowestEntropy) {
+                    lowestEntropy = this.entropyMap[i][j];
+                    nextField = [i, j];
+                }
+            }
+        }
+        return nextField;
     }
     placeTile(field) {
-        return 0;
+        const fieldDomain = this.output[field[0]][field[1]];
+        const fieldDomainWeights = [];
+        for (let i = 0; i < fieldDomain.length; i++) {
+            if (fieldDomain[i]) {
+                fieldDomainWeights.push(this.weightings[i]);
+            }
+            else {
+                fieldDomainWeights.push(0);
+            }
+        }
+        const cumulatedWeights = fieldDomainWeights.reduce((partialSum, a) => partialSum += a);
+        let randNum = Math.random() * cumulatedWeights;
+        for (let i = 0; i < fieldDomainWeights.length; i++) {
+            if (fieldDomainWeights[i] === 0) {
+                continue;
+            }
+            if (fieldDomainWeights[i] >= randNum) {
+                this.output[field[0]][field[1]].fill(false);
+                this.output[field[0]][field[1]][i] = true;
+                this.entropyMap[field[0]][field[1]] = 1;
+                return;
+            }
+            randNum -= fieldDomainWeights[i];
+        }
     }
     propagateChanges(field) {
+        let propagationStack = new ts_data_stack_1.default();
+        this.pushNeighbours(field, propagationStack);
+        while (!propagationStack.isEmpty()) {
+            const fieldToPropagate = propagationStack.pop();
+            let possibleTiles = [];
+            //check ruleset for all possible tiles in field above
+            if (this.isFieldOnOutput([fieldToPropagate[0] - 1, fieldToPropagate[1]])) {
+                const indiciesForRules = this.output[fieldToPropagate[0] - 1][fieldToPropagate[1]].map((v, i) => {
+                    if (v) {
+                        return i;
+                    }
+                });
+                indiciesForRules.filter(e => e).forEach(e => {
+                    possibleTiles = possibleTiles.concat(this.ruleset[e][2]);
+                });
+            }
+            //check ruleset for all possible tiles in field to the right
+            if (this.isFieldOnOutput([fieldToPropagate[0], fieldToPropagate[1] + 1])) {
+                const indiciesForRules = this.output[fieldToPropagate[0]][fieldToPropagate[1] + 1].map((v, i) => {
+                    if (v) {
+                        return i;
+                    }
+                });
+                indiciesForRules.filter(e => e).forEach(e => {
+                    possibleTiles = possibleTiles.concat(this.ruleset[e][2]);
+                });
+            }
+            //check ruleset for all possible tiles in field below
+            if (this.isFieldOnOutput([fieldToPropagate[0] + 1, fieldToPropagate[1]])) {
+                const indiciesForRules = this.output[fieldToPropagate[0] + 1][fieldToPropagate[1]].map((v, i) => {
+                    if (v) {
+                        return i;
+                    }
+                });
+                indiciesForRules.filter(e => e).forEach(e => {
+                    possibleTiles = possibleTiles.concat(this.ruleset[e][2]);
+                });
+            }
+            //check ruleset for all possible tiles in field to the left
+            if (this.isFieldOnOutput([fieldToPropagate[0], fieldToPropagate[1] - 1])) {
+                const indiciesForRules = this.output[fieldToPropagate[0]][fieldToPropagate[1] - 1].map((v, i) => {
+                    if (v) {
+                        return i;
+                    }
+                });
+                indiciesForRules.filter(e => e).forEach(e => {
+                    possibleTiles = possibleTiles.concat(this.ruleset[e][2]);
+                });
+            }
+            possibleTiles = possibleTiles.filter((v, i, self) => { self.indexOf(v) === i; });
+            let changed = false;
+            for (let i = 0; i < this.output[fieldToPropagate[0]][fieldToPropagate[1]].length; i++) {
+                if (!possibleTiles.includes(i) && !this.output[fieldToPropagate[0]][fieldToPropagate[1]][i]) {
+                    this.output[fieldToPropagate[0]][fieldToPropagate[1]][i] = false;
+                    changed = true;
+                }
+            }
+            if (changed) {
+                this.pushNeighbours(fieldToPropagate, propagationStack);
+            }
+        }
+    }
+    pushNeighbours(field, propagationStack) {
+        if (this.isFieldOnOutput([field[0] - 1, field[1]]) && this.entropyMap[field[0] - 1][field[1]] > 1) {
+            propagationStack.push([field[0] - 1, field[1]]);
+        }
+        if (this.isFieldOnOutput([field[0], field[1] + 1]) && this.entropyMap[field[0]][field[1] + 1] > 1) {
+            propagationStack.push([field[0], field[1] + 1]);
+        }
+        if (this.isFieldOnOutput([field[0] + 1, field[1]]) && this.entropyMap[field[0] + 1][field[1]] > 1) {
+            propagationStack.push([field[0] + 1, field[1]]);
+        }
+        if (this.isFieldOnOutput([field[0], field[1] - 1]) && this.entropyMap[field[0]][field[1] - 1] > 1) {
+            propagationStack.push([field[0], field[1] - 1]);
+        }
+    }
+    isFieldOnOutput(field) {
+        if (field[0] < 0 || field[1] < 0) {
+            return false;
+        }
+        return field[0] < this.output.length && field[1] < this.output[field[0]].length;
+    }
+    checkCollapsed() {
+        for (let e of this.entropyMap) {
+            for (let a of e) {
+                if (a > 1) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 }
 let a = new WfcModel('tilesets/tileset1/rules.json', [5, 5]);
+a.collapse();
+a.getResultAsDecodedPNG();
