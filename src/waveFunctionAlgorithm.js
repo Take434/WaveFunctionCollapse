@@ -63,11 +63,12 @@ class WfcModel {
         this.initializeOutput();
     }
     collapse() {
-        while (!this.isCollapsed) {
+        while (!this.isCollapsed && !this.isContradicted) {
             const nextField = this.chooseNextField();
             this.placeTile(nextField);
             this.propagateChanges(nextField);
             this.isCollapsed = this.checkCollapsed();
+            this.isContradicted = this.checkContradicted();
         }
         if (this.isContradicted) {
             console.error("reached Contradiction");
@@ -78,10 +79,16 @@ class WfcModel {
         this.collapse();
     }
     getResultAsDecodedPNG() {
+        if (this.isContradicted) {
+            return;
+        }
         console.log(this.output);
     }
     saveResultAsFile(filePath) {
         return __awaiter(this, void 0, void 0, function* () {
+            if (this.isContradicted) {
+                return;
+            }
             const tileImages = [];
             for (let p of this.lookUp) {
                 tileImages.push(png.decode(yield this.getImgAsIOBuffer('' + p)));
@@ -151,7 +158,7 @@ class WfcModel {
         let lowestEntropy = this.entropyMap[0][0];
         for (let i = 0; i < this.entropyMap.length; i++) {
             for (let j = 0; j < this.entropyMap[i].length; j++) {
-                if (lowestEntropy === 1 || this.entropyMap[i][j] < lowestEntropy) {
+                if (lowestEntropy === 1 || (this.entropyMap[i][j] < lowestEntropy && this.entropyMap[i][j] !== 1)) {
                     lowestEntropy = this.entropyMap[i][j];
                     nextField = [i, j];
                 }
@@ -190,7 +197,10 @@ class WfcModel {
         this.pushNeighbours(field, propagationStack);
         while (!propagationStack.isEmpty()) {
             const fieldToPropagate = propagationStack.pop();
-            let possibleTiles = [];
+            let possibleTiles = new Array(this.lookUp.length);
+            for (let i = 0; i < possibleTiles.length; i++) {
+                possibleTiles[i] = i;
+            }
             //check ruleset for all possible tiles in field above
             if (this.isFieldOnOutput([fieldToPropagate[0] - 1, fieldToPropagate[1]])) {
                 const indiciesForRules = this.output[fieldToPropagate[0] - 1][fieldToPropagate[1]].map((v, i) => {
@@ -198,9 +208,12 @@ class WfcModel {
                         return i;
                     }
                 });
-                indiciesForRules.filter(e => e).forEach(e => {
-                    possibleTiles = possibleTiles.concat(this.ruleset[e][2]);
-                });
+                let possibleAdjacentTiles = [];
+                for (let e of indiciesForRules.filter(e => e !== undefined)) {
+                    possibleAdjacentTiles = possibleAdjacentTiles.concat(this.ruleset[e][2]);
+                }
+                ;
+                possibleTiles = possibleTiles.filter(v => possibleAdjacentTiles.includes(v));
             }
             //check ruleset for all possible tiles in field to the right
             if (this.isFieldOnOutput([fieldToPropagate[0], fieldToPropagate[1] + 1])) {
@@ -209,9 +222,12 @@ class WfcModel {
                         return i;
                     }
                 });
-                indiciesForRules.filter(e => e).forEach(e => {
-                    possibleTiles = possibleTiles.concat(this.ruleset[e][2]);
-                });
+                let possibleAdjacentTiles = [];
+                for (let e of indiciesForRules.filter(e => e !== undefined)) {
+                    possibleAdjacentTiles = possibleAdjacentTiles.concat(this.ruleset[e][3]);
+                }
+                ;
+                possibleTiles = possibleTiles.filter(v => possibleAdjacentTiles.includes(v));
             }
             //check ruleset for all possible tiles in field below
             if (this.isFieldOnOutput([fieldToPropagate[0] + 1, fieldToPropagate[1]])) {
@@ -220,9 +236,12 @@ class WfcModel {
                         return i;
                     }
                 });
-                indiciesForRules.filter(e => e).forEach(e => {
-                    possibleTiles = possibleTiles.concat(this.ruleset[e][2]);
-                });
+                let possibleAdjacentTiles = [];
+                for (let e of indiciesForRules.filter(e => e !== undefined)) {
+                    possibleAdjacentTiles = possibleAdjacentTiles.concat(this.ruleset[e][0]);
+                }
+                ;
+                possibleTiles = possibleTiles.filter(v => possibleAdjacentTiles.includes(v));
             }
             //check ruleset for all possible tiles in field to the left
             if (this.isFieldOnOutput([fieldToPropagate[0], fieldToPropagate[1] - 1])) {
@@ -231,16 +250,18 @@ class WfcModel {
                         return i;
                     }
                 });
-                indiciesForRules.filter(e => e).forEach(e => {
-                    possibleTiles = possibleTiles.concat(this.ruleset[e][2]);
-                });
+                let possibleAdjacentTiles = [];
+                for (let e of indiciesForRules.filter(e => e !== undefined)) {
+                    possibleAdjacentTiles = possibleAdjacentTiles.concat(this.ruleset[e][1]);
+                }
+                ;
+                possibleTiles = possibleTiles.filter(v => possibleAdjacentTiles.includes(v));
             }
-            //fucky wucky
-            possibleTiles = possibleTiles.filter((v, i, self) => self.indexOf(v) === i);
             let changed = false;
             for (let i = 0; i < this.output[fieldToPropagate[0]][fieldToPropagate[1]].length; i++) {
-                if (!possibleTiles.includes(i) && !this.output[fieldToPropagate[0]][fieldToPropagate[1]][i]) {
+                if (!possibleTiles.includes(i) && this.output[fieldToPropagate[0]][fieldToPropagate[1]][i]) {
                     this.output[fieldToPropagate[0]][fieldToPropagate[1]][i] = false;
+                    this.entropyMap[fieldToPropagate[0]][fieldToPropagate[1]] -= 1;
                     changed = true;
                 }
             }
@@ -279,7 +300,17 @@ class WfcModel {
         }
         return true;
     }
+    checkContradicted() {
+        for (let e of this.entropyMap) {
+            for (let a of e) {
+                if (a < 1) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 }
-let a = new WfcModel('tilesets/tileset1/rules.json', [10, 10]);
+let a = new WfcModel('tilesets/tileset2/rules.json', [100, 100]);
 a.collapse();
 a.saveResultAsFile('testChanges.png');

@@ -59,7 +59,7 @@ class WfcModel {
     }
 
     public collapse() {
-        while(!this.isCollapsed) {
+        while(!this.isCollapsed && !this.isContradicted) {
             const nextField : [number, number] = this.chooseNextField();
 
             this.placeTile(nextField);
@@ -67,6 +67,7 @@ class WfcModel {
             this.propagateChanges(nextField);
 
             this.isCollapsed = this.checkCollapsed();
+            this.isContradicted = this.checkContradicted();
         }
 
         if(this.isContradicted) {
@@ -80,10 +81,20 @@ class WfcModel {
     }
 
     public getResultAsDecodedPNG()/* : DecodedPng */{
+
+        if(this.isContradicted) {
+            return;
+        }
+
         console.log(this.output);
     }
 
     public async saveResultAsFile(filePath : string) {
+
+        if(this.isContradicted) {
+            return;
+        }
+
         const tileImages : DecodedPng[] = [];
 
         for(let p of this.lookUp) {
@@ -168,7 +179,7 @@ class WfcModel {
 
         for(let i = 0; i < this.entropyMap.length; i++) {
             for(let j = 0; j < this.entropyMap[i].length; j++) {
-                if(lowestEntropy === 1 || this.entropyMap[i][j] < lowestEntropy) {
+                if(lowestEntropy === 1 || (this.entropyMap[i][j] < lowestEntropy && this.entropyMap[i][j] !== 1)) {
                     lowestEntropy = this.entropyMap[i][j];
                     nextField = [i, j];
                 }
@@ -219,7 +230,11 @@ class WfcModel {
         while(!propagationStack.isEmpty()) {
             const fieldToPropagate : [number, number] = propagationStack.pop();
 
-            let possibleTiles : number[] = [];
+            let possibleTiles : number[] = new Array<number>(this.lookUp.length);
+            for(let i = 0; i < possibleTiles.length; i++) {
+                possibleTiles[i] = i;
+            }
+
 
             //check ruleset for all possible tiles in field above
             if(this.isFieldOnOutput([fieldToPropagate[0] - 1, fieldToPropagate[1]])) {
@@ -228,10 +243,13 @@ class WfcModel {
                         return i;
                     }
                 }) as number[];
+                
+                let possibleAdjacentTiles : number[] = [];
+                for(let e of indiciesForRules.filter(e => e !== undefined)) {
+                    possibleAdjacentTiles = possibleAdjacentTiles.concat(this.ruleset[e][2]);
+                };
 
-                indiciesForRules.filter(e => e).forEach(e => {
-                    possibleTiles = possibleTiles.concat(this.ruleset[e][2]);
-                });
+                possibleTiles = possibleTiles.filter(v => possibleAdjacentTiles.includes(v));
             }
 
             //check ruleset for all possible tiles in field to the right
@@ -242,9 +260,12 @@ class WfcModel {
                     }
                 }) as number[];
 
-                indiciesForRules.filter(e => e).forEach(e => {
-                    possibleTiles = possibleTiles.concat(this.ruleset[e][2]);
-                });
+                let possibleAdjacentTiles : number[] = [];
+                for(let e of indiciesForRules.filter(e => e !== undefined)) {
+                    possibleAdjacentTiles = possibleAdjacentTiles.concat(this.ruleset[e][3]);
+                };
+
+                possibleTiles = possibleTiles.filter(v => possibleAdjacentTiles.includes(v));
             }
 
             //check ruleset for all possible tiles in field below
@@ -255,9 +276,12 @@ class WfcModel {
                     }
                 }) as number[];
 
-                indiciesForRules.filter(e => e).forEach(e => {
-                    possibleTiles = possibleTiles.concat(this.ruleset[e][2]);
-                });
+                let possibleAdjacentTiles : number[] = [];
+                for(let e of indiciesForRules.filter(e => e !== undefined)) {
+                    possibleAdjacentTiles = possibleAdjacentTiles.concat(this.ruleset[e][0]);
+                };
+
+                possibleTiles = possibleTiles.filter(v => possibleAdjacentTiles.includes(v));
             }
 
             //check ruleset for all possible tiles in field to the left
@@ -268,17 +292,19 @@ class WfcModel {
                     }
                 }) as number[];
 
-                indiciesForRules.filter(e => e).forEach(e => {
-                    possibleTiles = possibleTiles.concat(this.ruleset[e][2]);
-                });
+                let possibleAdjacentTiles : number[] = [];
+                for(let e of indiciesForRules.filter(e => e !== undefined)) {
+                    possibleAdjacentTiles = possibleAdjacentTiles.concat(this.ruleset[e][1]);
+                };
+
+                possibleTiles = possibleTiles.filter(v => possibleAdjacentTiles.includes(v));
             }
-            //fucky wucky
-            possibleTiles = possibleTiles.filter((v, i, self) => self.indexOf(v) === i);
 
             let changed : boolean = false;
             for(let i = 0; i < this.output[fieldToPropagate[0]][fieldToPropagate[1]].length; i++) {
-                if(!possibleTiles.includes(i) && !this.output[fieldToPropagate[0]][fieldToPropagate[1]][i]) {
+                if(!possibleTiles.includes(i) && this.output[fieldToPropagate[0]][fieldToPropagate[1]][i]) {
                     this.output[fieldToPropagate[0]][fieldToPropagate[1]][i] = false;
+                    this.entropyMap[fieldToPropagate[0]][fieldToPropagate[1]] -= 1; 
                     changed = true;
                 }
             }
@@ -324,8 +350,20 @@ class WfcModel {
 
         return true;
     }
+
+    private checkContradicted() : boolean {
+        for(let e of this.entropyMap) {
+            for(let a of e) {
+                if(a < 1) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
 }
 
-let a = new WfcModel('tilesets/tileset1/rules.json', [10, 10]);
+let a = new WfcModel('tilesets/tileset2/rules.json', [100, 100]);
 a.collapse();
 a.saveResultAsFile('testChanges.png');
