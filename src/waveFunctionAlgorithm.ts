@@ -175,18 +175,31 @@ class WfcModel {
 
     private chooseNextField() : [number, number] {
         let nextField : [number, number] = [0, 0];
-        let lowestEntropy : number = this.entropyMap[0][0];
+        //let lowestEntropy : number = this.entropyMap[0][0];
 
+        // for(let i = 0; i < this.entropyMap.length; i++) {
+        //     for(let j = 0; j < this.entropyMap[i].length; j++) {
+        //         if(lowestEntropy === 1 || (this.entropyMap[i][j] < lowestEntropy && this.entropyMap[i][j] !== 1)) {
+        //             lowestEntropy = this.entropyMap[i][j];
+        //             nextField = [i, j];
+        //         }
+        //     }
+        // }
+
+        const lowestEntropy : number = this.entropyMap.flat().sort().filter(v => v > 1)[0];
+        const fieldsWithLowestEntropy : [number, number][] = [];
+        
         for(let i = 0; i < this.entropyMap.length; i++) {
             for(let j = 0; j < this.entropyMap[i].length; j++) {
-                if(lowestEntropy === 1 || (this.entropyMap[i][j] < lowestEntropy && this.entropyMap[i][j] !== 1)) {
-                    lowestEntropy = this.entropyMap[i][j];
-                    nextField = [i, j];
+                if(this.entropyMap[i][j] === lowestEntropy) {
+                    fieldsWithLowestEntropy.push([i, j]);
                 }
             }
         }
 
-        return nextField;
+        const rand : number = Math.floor(Math.random() * (fieldsWithLowestEntropy.length - 1));
+
+        return fieldsWithLowestEntropy[rand];
     }
 
     private placeTile(field : [number, number]) {
@@ -364,6 +377,6 @@ class WfcModel {
     }
 }
 
-let a = new WfcModel('tilesets/tileset2/rules.json', [100, 100]);
+let a = new WfcModel('tilesets/tileset1/rules.json', [50, 50]);
 a.collapse();
 a.saveResultAsFile('testChanges.png');
