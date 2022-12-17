@@ -2,9 +2,17 @@
     "name": "debug",
     "version": "1.0",
     "scripts": {
-        "run": "ts-node ./waveFunctionAlgorithm.ts"
+        "run": "ts-node ./src/waveFunctionAlgorithm.ts",
+        "build": "tsc"
     },
     "devDependencies": {
-        "ts-node": "^10.9.1"
+        "@types/node": "^18.11.16",
+        "ts-node": "^10.9.1",
+        "tsconfig-paths": "^4.1.1"
+    },
+    "dependencies": {
+        "fast-png": "^6.1.0",
+        "iobuffer": "^5.3.1",
+        "ts-data.stack": "^1.0.6"
     }
 }

@@ -39,6 +39,16 @@ const fs = __importStar(require("fs"));
 const png = __importStar(require("fast-png"));
 const iobuffer_1 = require("iobuffer");
 const ts_data_stack_1 = __importDefault(require("ts-data.stack"));
+class MyDecodedPng {
+    constructor(w, h, data, depth, channels, text) {
+        this.width = w;
+        this.height = h;
+        this.channels = channels;
+        this.data = data;
+        this.depth = depth;
+        this.text = text !== null && text !== void 0 ? text : {};
+    }
+}
 class WfcModel {
     constructor(path, outputDims) {
         this.output = [[[]]];
@@ -72,13 +82,43 @@ class WfcModel {
     }
     saveResultAsFile(filePath) {
         return __awaiter(this, void 0, void 0, function* () {
-            const a = png.decode(yield this.getImgAsIOBuffer("tilesets/test.png"));
+            const tileImages = [];
+            for (let p of this.lookUp) {
+                tileImages.push(png.decode(yield this.getImgAsIOBuffer('' + p)));
+            }
+            const outputTileArrangement = new Array(this.output.length);
+            for (let i = 0; i < outputTileArrangement.length; i++) {
+                outputTileArrangement[i] = new Array(this.output[i].length);
+            }
+            for (let i = 0; i < this.output.length; i++) {
+                for (let j = 0; j < this.output[i].length; j++) {
+                    for (let k = 0; k < this.output[i][j].length; k++) {
+                        if (this.output[i][j][k]) {
+                            outputTileArrangement[i][j] = tileImages[k];
+                            break;
+                        }
+                    }
+                }
+            }
+            let outputImageArray = [];
+            const x = tileImages[0].height;
+            for (let e of outputTileArrangement) {
+                for (let i = 0; i < x; i++) {
+                    for (let j = 0; j < e.length; j++) {
+                        e[j].data.subarray(i * x * 3, (i + 1) * x * 3).forEach(e => {
+                            outputImageArray.push(e);
+                        });
+                    }
+                }
+            }
+            let a = new Uint16Array(outputImageArray);
+            const img = new MyDecodedPng(x * this.outputDims[0], x * this.outputDims[1], a, 8, 3);
+            fs.writeFileSync('' + filePath, png.encode(img));
         });
     }
     getImgAsIOBuffer(filePath) {
         return new Promise((resolve, reject) => {
-            let img = fs.createReadStream('tilesets/test.png');
-            let imgBuff;
+            let img = fs.createReadStream('' + filePath);
             let chunks = [];
             img.on('data', (chunk) => {
                 chunks.push(chunk);
@@ -195,7 +235,8 @@ class WfcModel {
                     possibleTiles = possibleTiles.concat(this.ruleset[e][2]);
                 });
             }
-            possibleTiles = possibleTiles.filter((v, i, self) => { self.indexOf(v) === i; });
+            //fucky wucky
+            possibleTiles = possibleTiles.filter((v, i, self) => self.indexOf(v) === i);
             let changed = false;
             for (let i = 0; i < this.output[fieldToPropagate[0]][fieldToPropagate[1]].length; i++) {
                 if (!possibleTiles.includes(i) && !this.output[fieldToPropagate[0]][fieldToPropagate[1]][i]) {
@@ -239,6 +280,6 @@ class WfcModel {
         return true;
     }
 }
-let a = new WfcModel('tilesets/tileset1/rules.json', [5, 5]);
+let a = new WfcModel('tilesets/tileset1/rules.json', [10, 10]);
 a.collapse();
-a.getResultAsDecodedPNG();
+a.saveResultAsFile('testChanges.png');

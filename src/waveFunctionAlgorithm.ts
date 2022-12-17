@@ -12,6 +12,28 @@ type jsonRules = [
     }
 ]
 
+class MyDecodedPng implements DecodedPng {
+    width: number;
+    height: number;
+    data: png.PngDataArray;
+    depth: png.BitDepth;
+    channels: number;
+    text: { [key: string]: string; };
+    resolution?: png.PngResolution | undefined;
+    palette?: png.IndexedColors | undefined;
+    iccEmbeddedProfile?: png.IccEmbeddedProfile | undefined;
+
+    constructor(w : number, h : number, data : png.PngDataArray, depth: png.BitDepth, channels: number, text? : { [key: string]: string }) {
+        this.width = w;
+        this.height = h;
+        this.channels = channels;
+        this.data = data;
+        this.depth = depth;
+        this.text = text ?? {};
+    }
+
+}
+
 class WfcModel {
 
     private lookUp : String[];
@@ -62,13 +84,50 @@ class WfcModel {
     }
 
     public async saveResultAsFile(filePath : string) {
-        const a : DecodedPng = png.decode(await this.getImgAsIOBuffer("tilesets/test.png"));
+        const tileImages : DecodedPng[] = [];
+
+        for(let p of this.lookUp) {
+            tileImages.push(png.decode(await this.getImgAsIOBuffer('' + p)));
+        }
+
+        const outputTileArrangement : DecodedPng[][] = new Array<Array<DecodedPng>>(this.output.length);
+        for(let i = 0; i < outputTileArrangement.length; i++) {
+            outputTileArrangement[i] = new Array<DecodedPng>(this.output[i].length);
+        }
+
+        for(let i = 0; i < this.output.length; i++) {
+            for(let j = 0; j < this.output[i].length; j++) {
+                for(let k = 0; k < this.output[i][j].length; k++) {
+                    if(this.output[i][j][k]) {
+                        outputTileArrangement[i][j] = tileImages[k];
+                        break;
+                    }
+                }
+            }
+        }
+
+        let outputImageArray : number[] = [];
+        const x : number = tileImages[0].height;
+        
+        for(let e of outputTileArrangement) {
+            for(let i = 0; i < x; i++) {
+                for(let j = 0; j < e.length; j++) {
+                    e[j].data.subarray(i * x * 3, (i + 1) * x * 3).forEach(e => {
+                        outputImageArray.push(e);
+                    })
+                }
+            }
+        }
+
+        let a = new Uint16Array(outputImageArray);
+        const img : MyDecodedPng = new MyDecodedPng(x * this.outputDims[0], x * this.outputDims[1], a , 8, 3);
+       
+        fs.writeFileSync('' + filePath, png.encode(img));
     }
 
     private getImgAsIOBuffer(filePath : string) : Promise<IOBuffer> {
         return new Promise((resolve, reject) => {
-            let img = fs.createReadStream('tilesets/test.png');
-            let imgBuff : IOBuffer;
+            let img = fs.createReadStream('' + filePath);
             let chunks : Buffer[] = [];
 
             img.on('data', (chunk) => {
@@ -213,8 +272,8 @@ class WfcModel {
                     possibleTiles = possibleTiles.concat(this.ruleset[e][2]);
                 });
             }
-
-            possibleTiles = possibleTiles.filter((v, i, self) => { self.indexOf(v) === i });
+            //fucky wucky
+            possibleTiles = possibleTiles.filter((v, i, self) => self.indexOf(v) === i);
 
             let changed : boolean = false;
             for(let i = 0; i < this.output[fieldToPropagate[0]][fieldToPropagate[1]].length; i++) {
@@ -267,6 +326,6 @@ class WfcModel {
     }
 }
 
-let a = new WfcModel('tilesets/tileset1/rules.json', [5, 5]);
+let a = new WfcModel('tilesets/tileset1/rules.json', [10, 10]);
 a.collapse();
-a.getResultAsDecodedPNG();
+a.saveResultAsFile('testChanges.png');
