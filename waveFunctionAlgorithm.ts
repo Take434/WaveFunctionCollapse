@@ -16,9 +16,13 @@ class WfcModel {
     private lookUp : String[];
     private weightings : number[];
     private ruleset : number[][][];
+    private outputDims : [number, number];
 
-    private output : boolean[][][];
-    private entropyMap : number[][];
+    private output : boolean[][][] = [[[]]];
+    private entropyMap : number[][] = [[]];
+
+    public isCollapsed : boolean = false;
+    public isContradicted : boolean = false;
 
     constructor(path : String, outputDims : [number, number]) {
         var jsonData : jsonRules = JSON.parse(fs.readFileSync('' + path, 'utf-8'));
@@ -26,67 +30,90 @@ class WfcModel {
         this.lookUp = jsonData.map(e => e.Path);
         this.weightings = jsonData.map(e => e.Weight);
         this.ruleset = jsonData.map(e => e.Rules);
+        this.outputDims = outputDims;
 
-        this.output = new Array(outputDims[0]);
-        for(let i = 0; i < outputDims[0]; i++) {
-            this.output[i] = new Array(outputDims[1]);
-            
-            for(let j = 0; j < outputDims[1]; j++) {
-                this.output[i][j] = new Array(this.lookUp.length);
-                this.output[i][j] = this.output[i][j].fill(true);
-            }
-        }
-
-        this.entropyMap = new Array(outputDims[0]);
-        for(let i = 0; i < outputDims[0]; i++) {
-            this.entropyMap[i] = new Array(outputDims[1]);
-            this.entropyMap[i] = this.entropyMap[i].fill(this.lookUp.length);
-        }
+        this.initializeOutput();
     }
 
     public collapse() {
-        
+
+        while(!this.isCollapsed) {
+            const nextField : [number, number] = this.chooseNextField();
+
+            this.placeTile(nextField);
+
+            this.propagateChanges(nextField);
+        }
+
+        if(this.isContradicted) {
+            console.error("reached Contradiction");
+        }
+    }
+
+    public reCollapse() {
+        this.initializeOutput();
+        this.collapse();
     }
 
     // public getResultAsDecodedPNG() : DecodedPng {
         
     // }
 
-    public saveResultAsFile(filePath : string) {
-        var img = fs.createReadStream('tilesets/test.png');
-        var imgBuff : IOBuffer;
-        let chunks : Buffer[] = [];
+    public async saveResultAsFile(filePath : string) {
+        
+    }
 
-        img.on('data', (chunk) => {
-            chunks.push(chunk as Buffer);
-        });
+    private getImgAsIOBuffer(filePath : string) : Promise<IOBuffer> {
 
-        img.once('end', () => {
-            imgBuff = new IOBuffer(Buffer.concat(chunks));
-            var a = png.decode(imgBuff);
+        return new Promise((resolve, reject) => {
+            var img = fs.createReadStream('tilesets/test.png');
+            var imgBuff : IOBuffer;
+            let chunks : Buffer[] = [];
 
-            a.data[0] = 3;
-            a.data[1] = 36;
-            a.data[2] = 252;
-
-            var b = png.encode(a);
-
-            fs.writeFile('' + filePath, b, () => { 
-                console.log("all written up boss");
+            img.on('data', (chunk) => {
+                chunks.push(chunk as Buffer);
             });
+
+            img.once('end', () => {
+                resolve(new IOBuffer(Buffer.concat(chunks)));
+            });
+
+            img.once('error', (e) => {
+                reject(e);
+            })
         });
     }
 
-    // private chooseNextField() : [number, number] {
+    private initializeOutput() {
 
-    // }
+        this.output = new Array(this.outputDims[0]);
+        for(let i = 0; i < this.outputDims[0]; i++) {
+            this.output[i] = new Array(this.outputDims[1]);
+            
+            for(let j = 0; j < this.outputDims[1]; j++) {
+                this.output[i][j] = new Array(this.lookUp.length);
+                this.output[i][j] = this.output[i][j].fill(true);
+            }
+        }
 
-    // private chooseTileToPlace() : number {
+        this.entropyMap = new Array(this.outputDims[0]);
+        for(let i = 0; i < this.outputDims[0]; i++) {
+            this.entropyMap[i] = new Array(this.outputDims[1]);
+            this.entropyMap[i] = this.entropyMap[i].fill(this.lookUp.length);
+        }
+    }
 
-    // }
+    private chooseNextField() : [number, number] {
+        
+    }
 
-    // private propagateChanges() {}
+    private placeTile(field : [number, number]) : number {
+        
+    }
+
+    private propagateChanges(field : [number, number]) {
+
+    }
 }
 
 let a = new WfcModel('tilesets/tileset1/rules.json', [5, 5]);
-a.saveResultAsFile("testChanges.png");
