@@ -118,12 +118,12 @@ class WfcModel {
         }
 
         let outputImageArray : number[] = [];
-        const x : number = tileImages[0].height;
+        const height : number = tileImages[0].height;
         
         for(let e of outputTileArrangement) {
-            for(let i = 0; i < x; i++) {
+            for(let i = 0; i < height; i++) {
                 for(let j = 0; j < e.length; j++) {
-                    e[j].data.subarray(i * x * 3, (i + 1) * x * 3).forEach(e => {
+                    e[j].data.subarray(i * height * 3, (i + 1) * height * 3).forEach(e => {
                         outputImageArray.push(e);
                     })
                 }
@@ -131,7 +131,7 @@ class WfcModel {
         }
 
         let a = new Uint16Array(outputImageArray);
-        const img : MyDecodedPng = new MyDecodedPng(x * this.outputDims[0], x * this.outputDims[1], a , 8, 3);
+        const img : MyDecodedPng = new MyDecodedPng(height * this.outputDims[1], height * this.outputDims[0], a , 8, 3);
        
         fs.writeFileSync('' + filePath, png.encode(img));
     }
@@ -377,6 +377,6 @@ class WfcModel {
     }
 }
 
-let a = new WfcModel('tilesets/tileset1/rules.json', [50, 50]);
+let a = new WfcModel('tilesets/tileset2/rules.json', [20, 50]);
 a.collapse();
 a.saveResultAsFile('testChanges.png');
