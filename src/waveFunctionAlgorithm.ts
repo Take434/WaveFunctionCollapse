@@ -173,8 +173,8 @@ class WfcModel {
     }
 
     private chooseNextField() : [number, number] {
-        //let nextField : [number, number] = [0, 0];
-        //let lowestEntropy : number = this.entropyMap[0][0];
+        // let nextField : [number, number] = [0, 0];
+        // let lowestEntropy : number = this.entropyMap[0][0];
 
         // for(let i = 0; i < this.entropyMap.length; i++) {
         //     for(let j = 0; j < this.entropyMap[i].length; j++) {
@@ -184,6 +184,8 @@ class WfcModel {
         //         }
         //     }
         // }
+
+        // return nextField;
 
         const lowestEntropy : number = this.entropyMap.flat().sort().filter(v => v > 1)[0];
         const fieldsWithLowestEntropy : [number, number][] = [];
@@ -376,6 +378,6 @@ class WfcModel {
     }
 }
 
-let a = new WfcModel('tilesets/tileset2/rules.json', [100, 100]);
+let a = new WfcModel('tilesets/tileset4/rules.json', [50, 50]);
 a.collapse();
 a.saveResultAsFile('testChanges.png');
