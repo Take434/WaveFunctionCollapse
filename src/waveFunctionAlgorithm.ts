@@ -4,13 +4,13 @@ import { IOBuffer } from 'iobuffer';
 import { DecodedPng } from 'fast-png';
 import Stack from 'ts-data.stack';
 
-type jsonRules = [
+type jsonRules =
     {
         Path : string,
         Weight : number, 
         Rules : number[][]
-    }
-]
+    }[]
+
 
 class MyDecodedPng implements DecodedPng {
     width: number;
@@ -31,7 +31,6 @@ class MyDecodedPng implements DecodedPng {
         this.depth = depth;
         this.text = text ?? {};
     }
-
 }
 
 class WfcModel {
@@ -174,7 +173,7 @@ class WfcModel {
     }
 
     private chooseNextField() : [number, number] {
-        let nextField : [number, number] = [0, 0];
+        //let nextField : [number, number] = [0, 0];
         //let lowestEntropy : number = this.entropyMap[0][0];
 
         // for(let i = 0; i < this.entropyMap.length; i++) {
@@ -377,6 +376,6 @@ class WfcModel {
     }
 }
 
-let a = new WfcModel('tilesets/tileset2/rules.json', [20, 50]);
+let a = new WfcModel('tilesets/tileset2/rules.json', [100, 100]);
 a.collapse();
 a.saveResultAsFile('testChanges.png');
